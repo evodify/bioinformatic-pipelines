@@ -15,18 +15,9 @@ This script generates sbatch files to submit jobs for dogs read mapping.
 /private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA001614/CFA001614_S4_L004_R1_001.fastq.gz
 
 
-#Example output (there will a separate output file for each input line. 8 files in this example):
+#The output will consist of three sbatch files for each step of the pipeline. See the steps below.
 
-#!/bin/bash
-#SBATCH -A snic2017-7-329
-#SBATCH -p core
-#SBATCH -n 20
-#SBATCH -t 3-00:00:00
-#SBATCH -J align_CFA000787
-#SBATCH -o align_CFA000787.out
-#SBATCH -e align_CFA000787.err
-
-bwa mem -t 20 -M -R '@RG\tID:CFA000787_L001\tPL:illumina\tLB:CFA000787\tSM:CFA000787' /proj/uppstore2017236/b2013119/Reference/canFam3.fa /private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA000787/CFA000787_S3_L001_R1_001.fastq.gz /private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA000787/CFA000787_S3_L001_R2_001.fastq.gz | samtools sort -O bam -@ 20 > CFA000787_L001.bam
+Note! Some parts are hardcoded, e.g. the variant reference files. Modify sbatch.py file to change those parts.
 
 #command:
 
