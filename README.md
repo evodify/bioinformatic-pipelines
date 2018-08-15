@@ -19,5 +19,5 @@ command-to-execute
 [sbatch.py](sbatch.py) is a custom module that contains all necessary functions. It is loaded as `import sbatch `.
 
 [reads-to-VCF_dog.py](reads-to-VCF_dog.py) - generates sbatch files for genotyping pipeline:
-*mapping lines separately -> merge BAM files for all lanes -> mark duplicates -> perfrom BQSR -> Check mapping quality -> Genotype in GVCF mode-> Joint genotyping of all gVCF files*.
-See the details in the file.
+*mapping lines separately -> merge BAM files for all lanes -> mark duplicates -> perfrom BQSR -> check mapping quality -> genotype in GVCF mode-> joint genotyping of all gVCF files*.
+It mostly follows [the GATK best practices](https://software.broadinstitute.org/gatk/best-practices/workflow?id=11145). See the details in the file.
