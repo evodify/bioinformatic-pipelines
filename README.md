@@ -20,4 +20,4 @@ command-to-execute
 
 [reads-to-VCF_dog.py](reads-to-VCF_dog.py) - generates sbatch files for genotyping pipeline:
 *mapping lines separately -> merge BAM files for all lanes -> mark duplicates -> perfrom BQSR -> check mapping quality -> genotype in GVCF mode-> joint genotyping of all gVCF files*.
-It mostly follows [the GATK best practices](https://software.broadinstitute.org/gatk/best-practices/workflow?id=11145). See the details in the file.
+It mostly follows [the GATK best practices](https://software.broadinstitute.org/gatk/best-practices/workflow?id=11145). See the details in the file. This particular pipeline was used to genotype dogs.
