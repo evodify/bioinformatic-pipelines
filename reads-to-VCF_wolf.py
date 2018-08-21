@@ -49,6 +49,8 @@ args = parser.parse_args()
 pathfile = open(args.input, 'r')
 
 lanes = []
+prevFullPathR1List = []
+prevFullPathR1splitList = []
 sampleNames = []
 prevsampleName = 'NA'
 
@@ -61,15 +63,19 @@ for fullPathR1 in pathfile:
 
     if prevsampleName == 'NA' or sampleName == prevsampleName:
         lanes.append(laneName)
+        prevFullPathR1List.append(fileNameR1L)
+        prevFullPathR1splitList.append(fullPathR1split)
     else:
         sampleNames.append(prevsampleName)
         # mapping
         outputMap = sbatch.writeSbatchHeader(args.projectID, args.ncores, "1-00:00:00", prevsampleName, "map")
-        for lane in lanes:
-            sbatch.writeMapBWAJob(prevFileNameR1L, prevFullPathR1split, outputMap, args.reference, prevsampleName, lane, args.ncores)
+        for lane, pPath, pPathSplit in zip(lanes, prevFullPathR1List, prevFullPathR1splitList):
+            sbatch.writeMapStampyJob(pPath, pPathSplit, outputMap, args.reference, prevsampleName, lane, args.ncores)
         sbatch.writeNextSbath(outputMap, prevsampleName, "mergeMarkDuplBQSR")
         outputMap.close()
         lanes = [laneName]
+        prevFullPathR1List = [fileNameR1L]
+        prevFullPathR1splitList = [fullPathR1split]
 
         # merge lanes, mark duplicates, BQSR
         outputMerge = sbatch.writeSbatchHeader(args.projectID, 1, args.time, prevsampleName, "mergeMarkDuplBQSR")
@@ -89,6 +95,7 @@ for fullPathR1 in pathfile:
         # Genotype gVCF
         outputGVCF = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "gVCF")
         sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.reference)
+        outputGVCF.write("\nmkdir %s\nmv %s_* %s\n" % (prevsampleName, prevsampleName, prevsampleName))
         outputGVCF.close()
 
     prevsampleName = sampleName
@@ -96,13 +103,14 @@ for fullPathR1 in pathfile:
     prevFullPathR1split = fullPathR1split
 
 sampleNames.append(prevsampleName)
+prevFullPathR1List.append(prevFileNameR1L)
+prevFullPathR1splitList.append(prevFullPathR1split)
 # mapping
 outputMap = sbatch.writeSbatchHeader(args.projectID, args.ncores, "1-00:00:00", prevsampleName, "map")
-for lane in lanes:
-    sbatch.writeMapBWAJob(prevFileNameR1L, prevFullPathR1split, outputMap, args.reference, prevsampleName, lane, args.ncores)
+for lane, prevPath, prevPathSplit, in zip(lanes, prevFullPathR1List, prevFullPathR1splitList):
+    sbatch.writeMapStampyJob(prevPath, prevPathSplit, outputMap, args.reference, prevsampleName, lane, args.ncores)
 sbatch.writeNextSbath(outputMap, prevsampleName, "mergeMarkDuplBQSR")
 outputMap.close()
-lanes = [laneName]
 
 # merge lanes, mark duplicates, BQSR
 outputMerge = sbatch.writeSbatchHeader(args.projectID, 1, args.time, prevsampleName, "mergeMarkDuplBQSR")
@@ -122,6 +130,7 @@ outputQualimap.close()
 # Genotype gVCF
 outputGVCF = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "gVCF")
 sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.reference)
+outputGVCF.write("\nmkdir %s\nmv %s_* %s\n" % (prevsampleName, prevsampleName, prevsampleName))
 outputGVCF.close()
 
 # Join Genotyping of all gVCFs

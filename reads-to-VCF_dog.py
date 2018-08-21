@@ -83,18 +83,19 @@ for fullPathR1 in pathfile:
         sbatch.writeMarkDuplJob(outputMerge, prevsampleName)
         sbatch.writeBQSRJob(outputMerge, prevsampleName, args.reference)
         sbatch.writeNextSbath(outputMerge, prevsampleName, "gVCF")
-        sbatch.writeNextSbath(outputMerge, prevsampleName, "qualimap")
+        #sbatch.writeNextSbath(outputMerge, prevsampleName, "qualimap")
         sbatch.writeBQSRanalyzeCovariatesJob(outputMerge, prevsampleName, args.reference)
         outputMerge.close()
 
         # Qualimap
-        outputQualimap = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "qualimap")
-        sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores)
-        outputQualimap.close()
+        #outputQualimap = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "qualimap")
+        #sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores)
+        #outputQualimap.close()
 
         # Genotype gVCF
         outputGVCF = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "gVCF")
         sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.reference)
+        outputGVCF.write("\nmkdir %s\nmv %s_* %s\n" % (prevsampleName, prevsampleName, prevsampleName))
         outputGVCF.close()
 
     prevsampleName = sampleName
@@ -118,18 +119,19 @@ sbatch.writeMergeJob(outputMerge, prevsampleName)
 sbatch.writeMarkDuplJob(outputMerge, prevsampleName)
 sbatch.writeBQSRJob(outputMerge, prevsampleName, args.reference)
 sbatch.writeNextSbath(outputMerge, prevsampleName, "gVCF")
-sbatch.writeNextSbath(outputMerge, prevsampleName, "qualimap")
+#sbatch.writeNextSbath(outputMerge, prevsampleName, "qualimap")
 sbatch.writeBQSRanalyzeCovariatesJob(outputMerge, prevsampleName, args.reference)
 outputMerge.close()
 
 # Qualimap
-outputQualimap = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "qualimap")
-sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores)
-outputQualimap.close()
+#outputQualimap = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "qualimap")
+#sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores)
+#outputQualimap.close()
 
 # Genotype gVCF
 outputGVCF = sbatch.writeSbatchHeader(args.projectID, args.ncores, args.time, prevsampleName, "gVCF")
 sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.reference)
+outputGVCF.write("\nmkdir %s\nmv %s_* %s\n" % (prevsampleName, prevsampleName, prevsampleName))
 outputGVCF.close()
 
 # Join Genotyping of all gVCFs
