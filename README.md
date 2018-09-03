@@ -1,6 +1,6 @@
 #  Generate sbatch files
 
-Scripts to generate many sbatch for job submitting on Slurm cluster and pipelinining.
+Scripts to generate sbatch files and pipelines for a Slurm cluster.
 
 The content of `script.sbatch` looks like this:
 ```
