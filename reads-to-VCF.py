@@ -68,6 +68,10 @@ prevFullPathR1splitList = []
 sampleNames = []
 prevsampleName = 'NA'
 
+# sbatch script
+outputSbacth = open("reads-to-VCF.sbatch", 'w')
+outputSbacth.write("#!/bin/sh\n")
+
 for fullPathR1 in pathfile:
     fullPathR1split = fullPathR1.split("/")
     fileNameR1 = fullPathR1split[-1]
@@ -81,9 +85,6 @@ for fullPathR1 in pathfile:
         prevFullPathR1splitList.append(fullPathR1split)
     else:
         sampleNames.append(prevsampleName)
-        # sbatch script
-        outputSbacth = open("reads-to-VCF.sbatch", 'w')
-        outputSbacth.write("#!/bin/sh\n")
         # mapping
         jobIDs = ""
         for lane, pPath, pPathSplit in zip(lanes, prevFullPathR1List, prevFullPathR1splitList):
@@ -129,11 +130,11 @@ for fullPathR1 in pathfile:
 
         # Qualimap
         JobQualimap = prevsampleName + "_qualimap"
-        sbatch.writeSbatchScript(outputSbacth, JobQualimap, args.projectID, "1", args.time,
+        sbatch.writeSbatchScript(outputSbacth, JobQualimap, args.projectID, args.ncores, args.time,
                                  JobQualimap, JobQualimap + ".sh", jobIDs)
         outputQualimap = open(prevsampleName + "_qualimap.sh", 'w')
         outputQualimap.write("#!/bin/sh\n")
-        sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores, args.memory)
+        sbatch.writeQualimapJob(outputQualimap, prevsampleName, args.ncores, args.memory)
         outputQualimap.close()
 
     prevsampleName = sampleName
@@ -189,11 +190,11 @@ JobGVCFid = ":$" + JobGVCF
 
 # Qualimap
 JobQualimap = prevsampleName + "_qualimap"
-sbatch.writeSbatchScript(outputSbacth, JobQualimap, args.projectID, "1", args.time,
+sbatch.writeSbatchScript(outputSbacth, JobQualimap, args.projectID, args.ncores, args.time,
                          JobQualimap, JobQualimap + ".sh", jobIDs)
 outputQualimap = open(prevsampleName + "_qualimap.sh", 'w')
 outputQualimap.write("#!/bin/sh\n")
-sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores, args.memory)
+sbatch.writeQualimapJob(outputQualimap, prevsampleName, args.ncores, args.memory)
 outputQualimap.close()
 
 # Join Genotyping of all gVCFs

@@ -68,9 +68,9 @@ def writeMapStampyJob(fileNameR1list, filePathR1list, outputFile, divergence, re
     filePathR1 = filePathR1.rstrip()
     filePathR2 = filePathR2.rstrip()
     referenceStampy = reference.split(".")[0]
-    outputFile.write("\nstampy -g %s -h %s --substitutionrate=%s -t %s -o %s/%s_%s_stampy.bam "
+    outputFile.write("\nstampy.py -g %s -h %s --substitutionrate=%s -t %s -o %s/%s_%s_stampy.sam "
                      "--readgroup=ID:%s_%s  -M %s %s\n"
-                     "samtools sort -O bam -@ %s -m %sG %s/%s_%s_stampy.bam > %s_%s.bam\n"
+                     "samtools sort -O bam -@ %s -m %sG %s/%s_%s_stampy.sam > %s_%s.bam\n"
                      % (referenceStampy, referenceStampy, divergence, cores, tmp, sample, laneID,  sample, laneID, filePathR1, filePathR2,
                         cores, ram,  tmp, sample, laneID, sample, laneID))
 
@@ -90,11 +90,11 @@ def writeMergeJob(outputFile, sample, tmp):
 def writeMarkDuplJob(outputFile, sample, ram, tmp):
     '''Writes the MarkDuplicates job lines to the file'''
     outputFile.write("\njava -Xmx%sG -Djava.io.tmpdir=%s -jar picard.jar "
-                     "MarkDuplicates \\\nVALIDATION_STRINGENCY=LENIENT \\\nMETRICS_FILE=%s_merged_markDupl_metrix.txt \\\n"
+                     "MarkDuplicates \\\nVALIDATION_STRINGENCY=LENIENT \\\nMETRICS_FILE=%s/%s_merged_markDupl_metrix.txt \\\n"
                      "MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=15000 \\\nINPUT=%s/%s_merged.bam \\\n"
                      "OUTPUT=%s/%s_merged_markDupl.bam\n"
                      "\nrm %s/%s_merged.bam\n" %
-                     (ram, tmp, sample, tmp, sample, tmp, sample,  tmp, sample))
+                     (ram, tmp, tmp, sample, tmp, sample, tmp, sample,  tmp, sample))
 
 def writeBQSRJob(outputFile, sample, reference, ram, tmp, known_sites):
     '''Writes the BaseRecalibrator job lines to the file'''
@@ -133,7 +133,7 @@ def writeBQSRanalyzeCovariatesJob(outputFile, sample, reference, ram, known_site
                      "-plots %s_merged_markDupl_BQSR.pdf\n"
                      % (sample, ram, sample, sample, sample))
 
-def writeQualimaJob(outputFile, sample, cores, ram):
+def writeQualimapJob(outputFile, sample, cores, ram):
     '''Writes the samtools index job line to the file'''
     outputFile.write("\nqualimap bamqc -nt %s --java-mem-size=%sG -bam %s_merged_markDupl_BQSR.bam -outdir %s_qualimap\n"
                      % (cores, ram, sample, sample))
