@@ -18,6 +18,4 @@ command-to-execute
 
 [sbatch.py](sbatch.py) is a custom module that contains all necessary functions. It is loaded as `import sbatch `.
 
-[reads-to-VCF_dog.py](reads-to-VCF_dog.py) - the genomic variant calling pipeline:
-*mapping lanes -> merge BAM files from all lanes -> mark duplicates -> perfrom BQSR -> check mapping quality -> genotype in GVCF mode-> joint genotyping of all gVCF files*.
-It mostly follows [the GATK best practices](https://software.broadinstitute.org/gatk/best-practices/workflow?id=11145). See the details in the file. This particular pipeline was used to genotype dogs.
+[reads-to-VCF_dog.py](reads-to-VCF_dog.py) - the genomic variant calling pipeline. It is described in this [blog-post](http://evodify.com/genomic-variant-calling-pipeline/)

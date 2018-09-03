@@ -6,23 +6,27 @@ gVCF calling and joint VCF calling.
 
 #Example input:
 
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA000787/CFA000787_S3_L001_R1_001.fastq.gz
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA000787/CFA000787_S3_L002_R1_001.fastq.gz
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA000787/CFA000787_S3_L003_R1_001.fastq.gz
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA000787/CFA000787_S3_L004_R1_001.fastq.gz
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA001614/CFA001614_S4_L001_R1_001.fastq.gz
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA001614/CFA001614_S4_L002_R1_001.fastq.gz
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA001614/CFA001614_S4_L003_R1_001.fastq.gz
-/private/Arctiv_vs_agrarian_rawdata/170221_ST-E00215_0206_AHF35JALXX/Sample_CFA001614/CFA001614_S4_L004_R1_001.fastq.gz
-
+Sample_CFA000787/CFA000787_S3_L001_R1_001.fastq.gz
+Sample_CFA000787/CFA000787_S3_L002_R1_001.fastq.gz
+Sample_CFA000787/CFA000787_S3_L003_R1_001.fastq.gz
+Sample_CFA000787/CFA000787_S3_L004_R1_001.fastq.gz
+Sample_CFA001614/CFA001614_S4_L001_R1_001.fastq.gz
+Sample_CFA001614/CFA001614_S4_L002_R1_001.fastq.gz
+Sample_CFA001614/CFA001614_S4_L003_R1_001.fastq.gz
+Sample_CFA001614/CFA001614_S4_L004_R1_001.fastq.gz
 
 #The output will consist of three sbatch files for each step of the pipeline. See the steps below.
 
-Note! Some parts are hardcoded, e.g. the variant reference files. Modify sbatch.py file to change those parts.
+
+Note! This script requires the module sbatch.py. So, download and place it in the directory.
+
+You can find more instructions on how to use this script and pipeline at my blog:
+http://evodify.com/genomic-variant-calling-pipeline/
 
 #command:
 
-$ python reads-to-VCF.py -i input.txt -r canFam3.fa -p snic2017-7-392 -n 20 -t 10-00:00:00 -a BWA -k
+$ python reads-to-VCF.py -i R1.txt -r canFam3.fa -p snic2017 -n 20 -t 5-00:00:00 -l \$SNIC_TMP -a BWA -m 4 \
+-k "dogs.557.publicSamples.ann.chrAll.PASS.vcf.gz,00-All_chrAll.vcf.gz"
 
 #contact:
 
