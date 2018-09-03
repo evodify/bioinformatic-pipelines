@@ -38,8 +38,8 @@ def writeSbatchScript(outputFile, jobID, projectID, cores, time, jobName, script
                          (jobID, dependency, projectID, cores, time, jobName, jobName, jobName, scriptName))
     outputFile.write("echo \"%s under the ID $%s has been submitted\"\n" % (scriptName, jobID))
 
-def writeMapBWAJob(fileNameR1list, filePathR1list, outputFile, reference, sample, laneID, cores):
-    '''Writes the job lines to the file'''
+def writeMapBWAJob(fileNameR1list, filePathR1list, outputFile, reference, sample, laneID, cores, ram):
+    '''Writes the BWA alignment job to the file'''
     # make R1, R2 file path first:
     filePathR1 = '/'.join(str(e) for e in filePathR1list) # R1
     #R2:
@@ -52,11 +52,11 @@ def writeMapBWAJob(fileNameR1list, filePathR1list, outputFile, reference, sample
     filePathR2 = filePathR2.rstrip()
     # write:
     outputFile.write("\nbwa mem -t %s -M -R '@RG\\tID:%s_%s\\tPL:illumina\\tLB:%s\\tSM:%s' %s %s %s "
-                     "| samtools sort -O bam -@ %s -m 4G > %s_%s.bam\n"
-                     % (cores, sample, laneID, sample, sample, reference, filePathR1, filePathR2, cores, sample, laneID))
+                     "| samtools sort -O bam -@ %s -m %sG > %s_%s.bam\n"
+                     % (cores, sample, laneID, sample, sample, reference, filePathR1, filePathR2, cores, ram, sample, laneID))
 
-def writeMapStampyJob(fileNameR1list, filePathR1list, outputFile, reference, sample, laneID, cores):
-    '''Writes the job lines to the file'''
+def writeMapStampyJob(fileNameR1list, filePathR1list, outputFile, divergence, reference, sample, laneID, cores, ram, tmp):
+    '''Writes the stampy alignment job to the file'''
     # make R1, R2 file path first:
     filePathR1 = '/'.join(str(e) for e in filePathR1list) # R1
     #R2:
@@ -68,143 +68,95 @@ def writeMapStampyJob(fileNameR1list, filePathR1list, outputFile, reference, sam
     filePathR1 = filePathR1.rstrip()
     filePathR2 = filePathR2.rstrip()
     referenceStampy = reference.split(".")[0]
-    outputFile.write("\n~/Programs/stampy/stampy.py -g %s -h %s --substitutionrate=0.002 -t %s -o $SNIC_TMP/%s_%s_stampy.bam "
+    outputFile.write("\nstampy -g %s -h %s --substitutionrate=%s -t %s -o %s/%s_%s_stampy.bam "
                      "--readgroup=ID:%s_%s  -M %s %s\n"
-                     "samtools sort -O bam -@ %s -m 4G $SNIC_TMP/%s_%s_stampy.bam > %s_%s.bam\n"
-                     % (referenceStampy, referenceStampy, cores, sample, laneID,  sample, laneID, filePathR1, filePathR2,
-                        cores, sample, laneID, sample, laneID))
+                     "samtools sort -O bam -@ %s -m %sG %s/%s_%s_stampy.bam > %s_%s.bam\n"
+                     % (referenceStampy, referenceStampy, divergence, cores, tmp, sample, laneID,  sample, laneID, filePathR1, filePathR2,
+                        cores, ram,  tmp, sample, laneID, sample, laneID))
 
 def writeNextSbath(outputFile, sample, jobName):
     '''Writes an sbatch line to submit the next job when this job is finished.'''
     outputFile.write("\nsbatch %s_%s.sbatch\n" % (sample, jobName))
 
 
-def writeMergeJob(outputFile, sample):
+def writeMergeJob(outputFile, sample, tmp):
     '''Writes the merge job lines to the file'''
     outputFile.write("\nls %s_L00?.bam | sed 's/  / /g;s/ /\\n/g' > %s_bam.list\n"
-                     "\nsamtools merge -b %s_bam.list $SNIC_TMP/%s_merged.bam\n"
+                     "\nsamtools merge -b %s_bam.list %s/%s_merged.bam\n"
                      "\nxargs -a %s_bam.list rm\n" %
-                     (sample, sample, sample, sample, sample))
+                     (sample, sample, sample, tmp, sample, sample))
 
 
-def writeMarkDuplJob(outputFile, sample):
+def writeMarkDuplJob(outputFile, sample, ram, tmp):
     '''Writes the MarkDuplicates job lines to the file'''
-    outputFile.write("\njava -Xmx4G -Djava.io.tmpdir=$SNIC_TMP -jar /sw/apps/bioinfo/picard/2.10.3/rackham/picard.jar "
+    outputFile.write("\njava -Xmx%sG -Djava.io.tmpdir=%s -jar picard.jar "
                      "MarkDuplicates \\\nVALIDATION_STRINGENCY=LENIENT \\\nMETRICS_FILE=%s_merged_markDupl_metrix.txt \\\n"
-                     "MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=15000 \\\nINPUT=$SNIC_TMP/%s_merged.bam \\\n"
-                     "OUTPUT=$SNIC_TMP/%s_merged_markDupl.bam\n"
-                     "\nrm $SNIC_TMP/%s_merged.bam\n" %
-                     (sample, sample, sample, sample))
+                     "MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=15000 \\\nINPUT=%s/%s_merged.bam \\\n"
+                     "OUTPUT=%s/%s_merged_markDupl.bam\n"
+                     "\nrm %s/%s_merged.bam\n" %
+                     (ram, tmp, sample, tmp, sample, tmp, sample,  tmp, sample))
 
-def writeBQSRJob(outputFile, sample, reference):
+def writeBQSRJob(outputFile, sample, reference, ram, tmp, known_sites):
     '''Writes the BaseRecalibrator job lines to the file'''
     outputFile.write("\n# Generate the first pass BQSR table file\n"
-                     "gatk --java-options \"-Xmx4G\"  BaseRecalibrator \\\n"
+                     "gatk --java-options \"-Xmx%sG\"  BaseRecalibrator \\\n"
                      "-R %s \\\n"
-                     "-I $SNIC_TMP/%s_merged_markDupl.bam \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_SNPs_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_indels_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/160DG.99.9.recalibrated_variants.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/00-All_chrAll.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/dogs.557.publicSamples.ann.chrAll.PASS.vcf.gz \\\n"
-                     "-O %s_merged_markDupl_BQSR.table\n"
+                     "-I %s/%s_merged_markDupl.bam \\\n" % (ram, reference, tmp, sample))
+    known_sitesP = known_sites.split(",")
+    for f in known_sitesP:
+        outputFile.write("--known-sites %s \\\n" % f)
+    outputFile.write("-O %s_merged_markDupl_BQSR.table\n"
                      "\n# Apply BQSR\n"
-                     "gatk --java-options \"-Xmx4G\"  ApplyBQSR \\\n"
+                     "gatk --java-options \"-Xmx%sG\"  ApplyBQSR \\\n"
                      "-R %s \\\n"
-                     "-I $SNIC_TMP/%s_merged_markDupl.bam \\\n"
+                     "-I %s/%s_merged_markDupl.bam \\\n"
                      "-bqsr %s_merged_markDupl_BQSR.table \\\n"
                      "-O %s_merged_markDupl_BQSR.bam\n"
-                     "\nrm $SNIC_TMP/%s_merged_markDupl.bam\n"
-                     % (reference, sample, sample, reference, sample, sample, sample, sample))
+                     "\nrm %s/%s_merged_markDupl.bam\n"
+                     % (sample, ram, reference, tmp, sample, sample, sample, tmp, sample))
 
-def writeBQSRwolfJob(outputFile, sample, reference):
-    '''Writes the BaseRecalibrator job lines to the file'''
-    outputFile.write("\n# Generate the first pass BQSR table file\n"
-                     "gatk --java-options \"-Xmx4G\"  BaseRecalibrator \\\n"
-                     "-R %s \\\n"
-                     "-I $SNIC_TMP/%s_merged_markDupl.bam \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_SNPs_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_indels_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/160DG.99.9.recalibrated_variants.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/00-All_chrAll.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/dogs.557.publicSamples.ann.chrAll.PASS.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/wolf.concat.raw.INDEL.filterPASSED.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/wolf.concat.raw.SNPs.filterPASSED.vcf.gz \\\n"
-                     "-O %s_merged_markDupl_BQSR.table\n"
-                     "\n# Apply BQSR\n"
-                     "gatk --java-options \"-Xmx4G\"  ApplyBQSR \\\n"
-                     "-R %s \\\n"
-                     "-I $SNIC_TMP/%s_merged_markDupl.bam \\\n"
-                     "-bqsr %s_merged_markDupl_BQSR.table \\\n"
-                     "-O %s_merged_markDupl_BQSR.bam\n"
-                     "\nrm $SNIC_TMP/%s_merged_markDupl.bam\n"
-                     % (reference, sample, sample, reference, sample, sample, sample, sample))
-
-
-def writeBQSRanalyzeCovariatesJob(outputFile, sample, reference):
+def writeBQSRanalyzeCovariatesJob(outputFile, sample, reference, ram, known_sites):
     '''Writes the BaseRecalibrator results check job lines to the file'''
     outputFile.write("\n# Generate the second pass BQSR table file\n"
-                     "gatk --java-options \"-Xmx4G\"  BaseRecalibrator \\\n"
+                     "gatk --java-options \"-Xmx%sG\"  BaseRecalibrator \\\n"
                      "-R %s \\\n"
                      "-I %s_merged_markDupl_BQSR.bam \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_SNPs_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_indels_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/160DG.99.9.recalibrated_variants.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/00-All_chrAll.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/dogs.557.publicSamples.ann.chrAll.PASS.vcf.gz \\\n"
-                     "-O %s_merged_markDupl_BQSR2.table\n"
+                     % (ram, reference, sample))
+    known_sitesP = known_sites.split(",")
+    for f in known_sitesP:
+        outputFile.write("--known-sites %s \\\n" % f)
+    outputFile.write("-O %s_merged_markDupl_BQSR2.table\n"
                      "\n# Plot the recalibration results\n"
-                     "gatk --java-options \"-Xmx4G\"  AnalyzeCovariates \\\n"
+                     "gatk --java-options \"-Xmx%sG\"  AnalyzeCovariates \\\n"
                      "-before %s_merged_markDupl_BQSR.table \\\n"
                      "-after %s_merged_markDupl_BQSR2.table \\\n"
                      "-plots %s_merged_markDupl_BQSR.pdf\n"
-                     % (reference, sample, sample, sample, sample, sample))
+                     % (sample, ram, sample, sample, sample))
 
-def writeBQSRanalyzeCovariatesWolfJob(outputFile, sample, reference):
-    '''Writes the BaseRecalibrator results check job lines to the file'''
-    outputFile.write("\n# Generate the second pass BQSR table file\n"
-                     "gatk --java-options \"-Xmx4G\"  BaseRecalibrator \\\n"
-                     "-R %s \\\n"
-                     "-I %s_merged_markDupl_BQSR.bam \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_SNPs_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/Axelsson_2013_indels_canfam3.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/160DG.99.9.recalibrated_variants.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/00-All_chrAll.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/dogs.557.publicSamples.ann.chrAll.PASS.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/wolf.concat.raw.INDEL.filterPASSED.vcf.gz \\\n"
-                     "--known-sites /proj/uppstore2017236/b2013119/private/dmytro/BQSR-reference/wolf.concat.raw.SNPs.filterPASSED.vcf.gz \\\n"
-                     "-O %s_merged_markDupl_BQSR2.table\n"
-                     "\n# Plot the recalibration results\n"
-                     "gatk --java-options \"-Xmx4G\"  AnalyzeCovariates \\\n"
-                     "-before %s_merged_markDupl_BQSR.table \\\n"
-                     "-after %s_merged_markDupl_BQSR2.table \\\n"
-                     "-plots %s_merged_markDupl_BQSR.pdf\n"
-                     % (reference, sample, sample, sample, sample, sample))
-
-def writeQualimaJob(outputFile, sample, cores):
+def writeQualimaJob(outputFile, sample, cores, ram):
     '''Writes the samtools index job line to the file'''
-    outputFile.write("\nqualimap bamqc -nt %s --java-mem-size=6G -bam %s_merged_markDupl_BQSR.bam -outdir %s_qualimap\n"
-                     % (cores, sample, sample))
+    outputFile.write("\nqualimap bamqc -nt %s --java-mem-size=%sG -bam %s_merged_markDupl_BQSR.bam -outdir %s_qualimap\n"
+                     % (cores, ram, sample, sample))
 
-def writeHaplotypeCallerJob(outputFile, sample, cores, reference):
+def writeHaplotypeCallerJob(outputFile, sample, cores, ram, reference):
     '''Writes the HaplotypeCaller in GVCF mode job lines to the file'''
-    outputFile.write("\ngatk --java-options \"-Xmx20G\" HaplotypeCaller \\\n"
+    outputFile.write("\ngatk --java-options \"-Xmx%sG\" HaplotypeCaller \\\n"
                      "-R %s \\\n"
                      "-ERC GVCF \\\n"
                      "-I %s_merged_markDupl_BQSR.bam \\\n"
                      "-O %s_merged_markDupl_BQSR.g.vcf.gz\n"
-                     % (reference, sample, sample))
+                     % (ram, reference, sample, sample))
 
 
-def writeGenotypeGVCFsJob(outputFile, samples, reference):
+def writeGenotypeGVCFsJob(outputFile, samples, ram, reference):
     '''Writes the GenotypeGVCFs job lines to the file'''
-    outputFile.write("\ngatk --java-options \"-Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true\" CombineGVCFs \\\n"
-                     "-R %s \\\n" % reference)
+    outputFile.write("\ngatk --java-options \"-Xmx%sg -DGATK_STACKTRACE_ON_USER_EXCEPTION=true\" CombineGVCFs \\\n"
+                     "-R %s \\\n" % (ram, reference))
     for sample in samples:
         outputFile.write("-V %s/%s_merged_markDupl_BQSR.g.vcf.gz \\\n" % (sample, sample))
     outputFile.write("-O GVCF_merged_markDupl_BQSR.g.vcf.gz\n")
 
-    outputFile.write("\ngatk --java-options \"-Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true\" GenotypeGVCFs \\\n"
+    outputFile.write("\ngatk --java-options \"-Xmx%sg -DGATK_STACKTRACE_ON_USER_EXCEPTION=true\" GenotypeGVCFs \\\n"
                      "-R %s \\\n"
                      "-V GVCF_merged_markDupl_BQSR.g.vcf.gz \\\n"
-                     "-O GVCF_merged_markDupl_BQSR.vcf.gz\n" % reference)
+                     "-O GVCF_merged_markDupl_BQSR.vcf.gz\n" % (ram, reference))

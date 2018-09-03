@@ -22,7 +22,7 @@ Note! Some parts are hardcoded, e.g. the variant reference files. Modify sbatch.
 
 #command:
 
-$ python reads-to-VCF.py -i input.txt -r canFam3.fa -p snic2017-7-392 -n 20 -t 10-00:00:00
+$ python reads-to-VCF.py -i input.txt -r canFam3.fa -p snic2017-7-392 -n 20 -t 10-00:00:00 -a BWA -k
 
 #contact:
 
@@ -40,13 +40,20 @@ parser = sbatch.CommandLineParser()
 parser.add_argument('-i', '--input', help = 'name of the file with a list of R1.fastq file names', type=str, required=True)
 parser.add_argument('-r', '--reference', help = 'name of the reference file', type=str, required=True)
 parser.add_argument('-p', '--projectID', help = 'name of the project', type=str, required=True)
-parser.add_argument('-n', '--ncores', help = 'maximum number of cores to request', type=str, required=True)
-parser.add_argument('-t', '--time', help = 'maximum available time to request', type=str, required=True)
-parser.add_argument('-a', '--aligner', help = 'aligner: BWA or stampy', type=str, required=True)
+parser.add_argument('-n', '--ncores', help = 'maximum number of cores to request (default 2)', type=int, required=False, default=2)
+parser.add_argument('-t', '--time', help = 'maximum available time to request (default 1-00:00:00)', type=str, required=False, default="1-00:00:00")
+parser.add_argument('-a', '--aligner', help = 'aligner: BWA or stampy (default BWA)', type=str, required=False, default="BWA")
+parser.add_argument('-d', '--divergence', help = 'mean divergence from the references for Stampy (default 0.001)', type=float, required=False, default=0.001)
+parser.add_argument('-m', '--memory', help = 'Maximum available RAM per core in GB (default 4)', type=int, required=False, default=4)
+parser.add_argument('-k', '--knowSites', help = 'comma separated list of known variants for BQSR', type=str, required=True)
+parser.add_argument('-l', '--tmpDirectory', help = 'path to the temporary directory', type=str, required=True)
 
 args = parser.parse_args()
+
+# check the aligner option
 if args.aligner not in ['BWA', 'stampy']:
     raise IOError('Incorrect value "%s"  in the --aligner option. Accepted values: BWA, stampy' % (args.aligner))
+
 ############################# program #############################
 
 pathfile = open(args.input, 'r')
@@ -71,7 +78,7 @@ for fullPathR1 in pathfile:
     else:
         sampleNames.append(prevsampleName)
         # sbatch script
-        outputSbacth = open("reads-to-VCF_wolf.sbatch", 'w')
+        outputSbacth = open("reads-to-VCF.sbatch", 'w')
         outputSbacth.write("#!/bin/sh\n")
         # mapping
         jobIDs = ""
@@ -79,12 +86,14 @@ for fullPathR1 in pathfile:
             outputMap = open(prevsampleName + "_" + lane + "_map.sh", 'w')
             outputMap.write("#!/bin/sh\n")
             if args.aligner == "stampy":
-                sbatch.writeMapStampyJob(pPath, pPathSplit, outputMap, args.reference, prevsampleName, lane, args.ncores)
+                sbatch.writeMapStampyJob(pPath, pPathSplit, outputMap, args.divergence, args.reference,
+                                         prevsampleName, lane, args.ncores, args.memory, args.tmpDirectory)
             else:
-                sbatch.writeMapBWAJob(pPath, pPathSplit, outputMap, args.reference, prevsampleName, lane, args.ncores)
+                sbatch.writeMapBWAJob(pPath, pPathSplit, outputMap, args.reference, prevsampleName, lane,
+                                      args.ncores, args.memory)
             outputMap.close()
             map_job = prevsampleName + "_" + lane
-            sbatch.writeSbatchScript(outputSbacth, map_job, args.projectID, "20", "1-00:00:00",
+            sbatch.writeSbatchScript(outputSbacth, map_job, args.projectID, args.ncores, args.time,
                                      map_job + "_map", map_job + "_map.sh")
             jobIDs += ":$"+map_job
         lanes = [laneName]
@@ -98,10 +107,10 @@ for fullPathR1 in pathfile:
         jobIDs = ":$"+JobMergeMarkDuplBQSR
         outputMerge = open(prevsampleName + "_mergeMarkDuplBQSR.sh", 'w')
         outputMerge.write("#!/bin/sh\n")
-        sbatch.writeMergeJob(outputMerge, prevsampleName)
-        sbatch.writeMarkDuplJob(outputMerge, prevsampleName)
-        sbatch.writeBQSRwolfJob(outputMerge, prevsampleName, args.reference)
-        sbatch.writeBQSRanalyzeCovariatesWolfJob(outputMerge, prevsampleName, args.reference)
+        sbatch.writeMergeJob(outputMerge, prevsampleName, args.tmpDirectory)
+        sbatch.writeMarkDuplJob(outputMerge, prevsampleName, args.memory, args.tmpDirectory)
+        sbatch.writeBQSRJob(outputMerge, prevsampleName, args.reference, args.memory, args.tmpDirectory, args.knowSites)
+        sbatch.writeBQSRanalyzeCovariatesJob(outputMerge, prevsampleName, args.reference, args.memory, args.knowSites)
         outputMerge.close()
 
         # Genotype gVCF
@@ -110,7 +119,7 @@ for fullPathR1 in pathfile:
                                  JobGVCF, JobGVCF + ".sh", jobIDs)
         outputGVCF = open(prevsampleName + "_gVCF.sh", 'w')
         outputGVCF.write("#!/bin/sh\n")
-        sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.reference)
+        sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.memory, args.reference)
         outputGVCF.write("\nmkdir %s\nmv %s_* %s\n" % (prevsampleName, prevsampleName, prevsampleName))
         outputGVCF.close()
 
@@ -120,7 +129,7 @@ for fullPathR1 in pathfile:
                                  JobQualimap, JobQualimap + ".sh", jobIDs)
         outputQualimap = open(prevsampleName + "_qualimap.sh", 'w')
         outputQualimap.write("#!/bin/sh\n")
-        sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores)
+        sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores, args.memory)
         outputQualimap.close()
 
     prevsampleName = sampleName
@@ -137,12 +146,13 @@ for lane, pPath, pPathSplit in zip(lanes, prevFullPathR1List, prevFullPathR1spli
     outputMap = open(prevsampleName + "_" + lane + "_map.sh", 'w')
     outputMap.write("#!/bin/sh\n")
     if args.aligner == "stampy":
-        sbatch.writeMapStampyJob(pPath, pPathSplit, outputMap, args.reference, prevsampleName, lane, args.ncores)
+        sbatch.writeMapStampyJob(pPath, pPathSplit, outputMap, args.divergence, args.reference,
+                                 prevsampleName, lane, args.ncores, args.memory, args.tmpDirectory)
     else:
-        sbatch.writeMapBWAJob(pPath, pPathSplit, outputMap, args.reference, prevsampleName, lane, args.ncores)
+        sbatch.writeMapBWAJob(pPath, pPathSplit, outputMap, args.reference, prevsampleName, lane, args.ncores, args.memory)
     outputMap.close()
     map_job = prevsampleName + "_" + lane
-    sbatch.writeSbatchScript(outputSbacth, map_job, args.projectID, "20", "1-00:00:00",
+    sbatch.writeSbatchScript(outputSbacth, map_job, args.projectID, args.ncores, args.time,
                              map_job + "_map", map_job + "_map.sh")
     jobIDs += ":$"+map_job
 lanes = [laneName]
@@ -156,10 +166,10 @@ sbatch.writeSbatchScript(outputSbacth, JobMergeMarkDuplBQSR, args.projectID, "1"
 jobIDs = ":$"+JobMergeMarkDuplBQSR
 outputMerge = open(prevsampleName + "_mergeMarkDuplBQSR.sh", 'w')
 outputMerge.write("#!/bin/sh\n")
-sbatch.writeMergeJob(outputMerge, prevsampleName)
-sbatch.writeMarkDuplJob(outputMerge, prevsampleName)
-sbatch.writeBQSRwolfJob(outputMerge, prevsampleName, args.reference)
-sbatch.writeBQSRanalyzeCovariatesWolfJob(outputMerge, prevsampleName, args.reference)
+sbatch.writeMergeJob(outputMerge, prevsampleName, args.tmpDirectory)
+sbatch.writeMarkDuplJob(outputMerge, prevsampleName, args.memory, args.tmpDirectory)
+sbatch.writeBQSRJob(outputMerge, prevsampleName, args.reference, args.memory, args.tmpDirectory, args.knowSites)
+sbatch.writeBQSRanalyzeCovariatesJob(outputMerge, prevsampleName, args.reference, args.memory, args.knowSites)
 outputMerge.close()
 
 # Genotype gVCF
@@ -168,7 +178,7 @@ sbatch.writeSbatchScript(outputSbacth, JobGVCF, args.projectID, "1", args.time,
                          JobGVCF, JobGVCF + ".sh", jobIDs)
 outputGVCF = open(prevsampleName + "_gVCF.sh", 'w')
 outputGVCF.write("#!/bin/sh\n")
-sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.reference)
+sbatch.writeHaplotypeCallerJob(outputGVCF, prevsampleName, args.ncores, args.memory, args.reference)
 outputGVCF.write("\nmkdir %s\nmv %s_* %s\n" % (prevsampleName, prevsampleName, prevsampleName))
 outputGVCF.close()
 JobGVCFid = ":$" + JobGVCF
@@ -179,12 +189,12 @@ sbatch.writeSbatchScript(outputSbacth, JobQualimap, args.projectID, "1", args.ti
                          JobQualimap, JobQualimap + ".sh", jobIDs)
 outputQualimap = open(prevsampleName + "_qualimap.sh", 'w')
 outputQualimap.write("#!/bin/sh\n")
-sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores)
+sbatch.writeQualimaJob(outputQualimap, prevsampleName, args.ncores, args.memory)
 outputQualimap.close()
 
 # Join Genotyping of all gVCFs
 outputGVCFall = sbatch.writeSbatchHeader(args.projectID, 1, args.time, 'GVCF', "all")
-sbatch.writeGenotypeGVCFsJob(outputGVCFall, sampleNames, args.reference)
+sbatch.writeGenotypeGVCFsJob(outputGVCFall, sampleNames, args.memory, args.reference)
 outputGVCFall.close()
 
 pathfile.close()
