@@ -81,7 +81,7 @@ def writeNextSbath(outputFile, sample, jobName):
 
 def writeMergeJob(outputFile, sample, tmp):
     '''Writes the merge job lines to the file'''
-    outputFile.write("\nls %s_L00?.bam | sed 's/  / /g;s/ /\\n/g' > %s_bam.list\n"
+    outputFile.write("\nls %s_*_L00?.bam | sed 's/  / /g;s/ /\\n/g' > %s_bam.list\n"
                      "\nsamtools merge -b %s_bam.list %s/%s_merged.bam\n"
                      "\nxargs -a %s_bam.list rm\n" %
                      (sample, sample, sample, tmp, sample, sample))

@@ -77,7 +77,7 @@ for fullPathR1 in pathfile:
     fileNameR1 = fullPathR1split[-1]
     fileNameR1L = fileNameR1.split("_")
     sampleName = fileNameR1L[0]
-    laneName = fileNameR1L[2]
+    laneName =  '_'.join(str(e) for e in fileNameR1L[1:3])
 
     if prevsampleName == 'NA' or sampleName == prevsampleName:
         lanes.append(laneName)
