@@ -68,11 +68,19 @@ def writeMapStampyJob(fileNameR1list, filePathR1list, outputFile, divergence, re
     filePathR1 = filePathR1.rstrip()
     filePathR2 = filePathR2.rstrip()
     referenceStampy = reference.split(".")[0]
-    outputFile.write("\nstampy.py -g %s -h %s --substitutionrate=%s -t %s -o %s/%s_%s_stampy.sam "
-                     "--readgroup=ID:%s_%s  -M %s %s\n"
-                     "samtools sort -O bam -@ %s -m %sG %s/%s_%s_stampy.sam > %s_%s.bam\n"
-                     % (referenceStampy, referenceStampy, divergence, cores, tmp, sample, laneID,  sample, laneID, filePathR1, filePathR2,
-                        cores, ram,  tmp, sample, laneID, sample, laneID))
+    outputFile.write("\nstampy.py -g %s -h %s --substitutionrate=%s -t %s -o %s/%s_%s_stampy.sam -M %s %s\n"
+                     "samtools sort -O bam -@ %s -m %sG %s/%s_%s_stampy.sam > %s/%s_%s.bam\n"
+                     "\njava -Xmx%sG -jar picard.jar AddOrReplaceReadGroups \\\n"
+                     "I=%s/%s_%s.bam \\\n"
+                     "O=%s_%s.bam \\\n"
+                     "RGID=%s_%s \\\n"
+                     "RGLB=%s \\\n"
+                     "RGPL=illumina \\\n"
+                     "RGPU=%s_%s \\\n"
+                     "RGSM=%s\n"
+                     % (referenceStampy, referenceStampy, divergence, cores, tmp, sample, laneID, filePathR1, filePathR2,
+                        cores, ram,  tmp, sample, laneID, tmp, sample, laneID,
+                        ram, tmp, sample, laneID, sample, laneID, sample, laneID, sample, sample, laneID, sample))
 
 def writeNextSbath(outputFile, sample, jobName):
     '''Writes an sbatch line to submit the next job when this job is finished.'''
