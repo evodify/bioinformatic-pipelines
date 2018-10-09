@@ -18,4 +18,4 @@ command-to-execute
 
 [sbatch.py](sbatch.py) is a custom module that contains all necessary functions. It is loaded as `import sbatch `.
 
-[reads-to-VCF_dog.py](reads-to-VCF_dog.py) - the genomic variant calling pipeline. It is described in this [blog-post](http://evodify.com/genomic-variant-calling-pipeline/)
+[reads-to-VCF.py](reads-to-VCF.py) - the genomic variant calling pipeline. It is described in this [blog-post](http://evodify.com/genomic-variant-calling-pipeline/)
