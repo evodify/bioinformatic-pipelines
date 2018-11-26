@@ -268,7 +268,7 @@ def writeQualimapJob(outputFile, sample, cores,
     Writes the samtools index job line to the file.
     '''
     outputFile.write(
-        "\nqualimap bamqc -nt %s"
+        "\nqualimap bamqc -nt %s "
         "--java-mem-size=%sG -bam %s_merged_markDupl_BQSR.bam"
         "-outdir %s_qualimap\n" %
         (cores,
