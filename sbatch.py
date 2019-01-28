@@ -262,40 +262,53 @@ def writeBQSRanalyzeCovariatesJob(outputFile, sample, reference,
                       sample, sample))
 
 
+def ifBQSR(BQSR):
+    if BQSR == None:
+        nameEnd = 'merged_markDupl'
+    else:
+        nameEnd = 'merged_markDupl_BQSR'
+    return nameEnd
+
 def writeQualimapJob(outputFile, sample, cores,
-                     ram):
+                     ram, BQSR):
     '''
     Writes the samtools index job line to the file.
     '''
+    nameTail = ifBQSR(BQSR)
     outputFile.write(
         "\nqualimap bamqc -nt %s "
-        "--java-mem-size=%sG -bam %s_merged_markDupl_BQSR.bam"
+        "--java-mem-size=%sG -bam %s_%s.bam "
         "-outdir %s_qualimap\n" %
         (cores,
-         ram, sample,
+         ram, sample, nameTail,
          sample))
 
 
 def writeHaplotypeCallerJob(outputFile, sample, cores,
-                            ram, reference):
+                            ram, reference, BQSR):
     '''
     Writes the HaplotypeCaller in GVCF mode job lines to the file.
     '''
+    nameTail = ifBQSR(BQSR)
     outputFile.write("\ngatk --java-options \"-Xmx%sG\" HaplotypeCaller \\\n"
                      "-R %s \\\n"
                      "-ERC GVCF \\\n"
-                     "-I %s_merged_markDupl_BQSR.bam \\\n"
-                     "-O %s_merged_markDupl_BQSR.g.vcf.gz\n"
-                     "\ntabix %s_merged_markDupl_BQSR.g.vcf.gz\n" %
-                     (ram, reference, sample,
-                      sample, sample))
+                     "-I %s_%s.bam \\\n"
+                     "-O %s_%s.g.vcf.gz\n"
+                     "\ntabix %s_%s.g.vcf.gz\n" %
+                     (ram,
+                      reference,
+                      sample, nameTail,
+                      sample, nameTail,
+                      sample, nameTail))
 
 
 def writeGenotypeGVCFsJob(outputFile, samples, ram,
-                          reference):
+                          reference, BQSR):
     '''
     Writes the GenotypeGVCFs job lines to the file.
     '''
+    nameTail = ifBQSR(BQSR)
     outputFile.write(
         "\ngatk --java-options \"-Xmx%sg "
         "-DGATK_STACKTRACE_ON_USER_EXCEPTION=true\" CombineGVCFs \\\n"
@@ -303,16 +316,16 @@ def writeGenotypeGVCFsJob(outputFile, samples, ram,
         (ram, reference))
     for sample in samples:
         outputFile.write(
-            "-V %s/%s_merged_markDupl_BQSR.g.vcf.gz \\\n" %
-            (sample, sample))
-    outputFile.write("-O GVCF_merged_markDupl_BQSR.g.vcf.gz\n"
-                     "\ntabix GVCF_merged_markDupl_BQSR.g.vcf.gz\n")
-
+            "-V %s_%s.g.vcf.gz \\\n" %
+            (sample, nameTail))
+    outputFile.write("-O GVCF_%s.g.vcf.gz\n"
+                     "\ntabix GVCF_%s.g.vcf.gz\n" %
+                     (nameTail, nameTail))
     outputFile.write(
         "\ngatk --java-options \"-Xmx%sg "
         "-DGATK_STACKTRACE_ON_USER_EXCEPTION=true\" GenotypeGVCFs \\\n"
         "-R %s \\\n"
-        "-V GVCF_merged_markDupl_BQSR.g.vcf.gz \\\n"
-        "-O GVCF_merged_markDupl_BQSR.vcf.gz\n"
-        "\ntabix GVCF_merged_markDupl_BQSR.vcf.gz\n" %
-        (ram, reference))
+        "-V GVCF_%s.g.vcf.gz \\\n"
+        "-O GVCF_%s.vcf.gz\n"
+        "\ntabix GVCF_%s.vcf.gz\n" %
+        (ram, reference, nameTail, nameTail, nameTail))
