@@ -1,4 +1,4 @@
-# Snakemake RNA-Seq STAR mapping pipeline
+# Snakemake GATK Copy Number variant calling pipeline
 
 The pipeline is described in this [blog-post](https://evodify.com/gatk-cnv-snakemake/)
 
