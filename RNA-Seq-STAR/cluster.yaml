@@ -1,0 +1,20 @@
+__default__:
+  account: snic2019-x-xxx
+  time: "00:01:00"
+  n: 1
+  partition: "core"
+ 
+index:
+  time: "05:00:00"
+  n: 20
+ 
+pass1:
+  time: "01:00:00"
+  n: 20
+ 
+pass2:
+  time: "02:00:00"
+  n: 20
+
+htseq:
+  time: "05:00:00" 
