@@ -8,4 +8,3 @@
 #SBATCH -o sbatchSnakefile.out
 
 snakemake -s Snakefile -j 100 --cluster-config cluster.yaml --cluster "sbatch -A {cluster.account} -t {cluster.time} -p {cluster.partition} -n {cluster.n}"
- 
