@@ -1,0 +1,10 @@
+__default__:
+  account: snic2017-7-392
+  time: "1:00:00"
+  n: 1
+  partition: "core"
+ 
+cnvcall:
+  n: 20
+  time: "5:00:00"
+ 
