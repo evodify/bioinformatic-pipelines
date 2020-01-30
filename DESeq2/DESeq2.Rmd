@@ -1,0 +1,324 @@
+---
+title: "Differential gene expression analysis (DESeq)"
+author: "Dmytro Kryvokhyzha"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '~/git/bioinformatic-pipelines/DESeq2')
+```
+
+# Libraries
+
+```{r libraries, message=FALSE, echo=FALSE}
+library(DESeq2)
+library(vsn)
+library(pheatmap)
+library(RColorBrewer)
+library(IHW)
+library(ggplot2)
+```
+
+# Load the data
+
+```{r rna-data}
+tissues <- c ('pancreas', 'muscle') # list of tissues
+for (t in tissues){
+  d <- read.table(paste('data/RNA-Seq_mmquant_', t, '.csv', sep=""),
+                  header=TRUE, row.names='Gene')
+  assign(paste(t, 'D', sep=""), d)
+  message(t, ": samples: ", dim(d)[2], ", genes: ", dim(d)[1])
+}
+rm(d,t)
+dannot <- read.csv('data/RNA-Seq_annot.csv', header = T)
+```
+
+# Functions
+
+I use [IHW p-value correction](https://www.nature.com/articles/nmeth.3885).
+
+```{r}
+runDEseq <- function(tissue, d, annot){
+  # annot <- dannot
+  # tissue <- 'pancreas'
+  # d <- get(paste('d', tissue, sep=""))
+  samplesID <- as.character(annot$Sample_id[(annot$Tissue==tissue) & 
+                                             annot$Sample_id %in% colnames(d)])
+
+  annot <- annot[annot$Sample_id %in% samplesID,]
+  d <- d[,samplesID]
+  
+  species <- as.character(annot$Species[annot$Sample_id %in% samplesID])
+  sex <- as.character(annot$Sex[annot$Sample_id %in% samplesID])
+  age <- as.character(annot$Age[annot$Sample_id %in% samplesID])
+  breed <- as.character(annot$Breed[annot$Sample_id %in% samplesID])
+  colData <- cbind(samplesID, species, sex, age, breed)
+  
+  dds <- DESeqDataSetFromMatrix(countData = d[,samplesID],
+                                colData = colData,
+                                design= ~ sex + age + species)
+  dds <- DESeq(dds)
+  res <- results(dds, contrast=c('species', 'wolf', 'dog'), filterFun=ihw)
+  #res <- lfcShrink(dds, coef="species_wolf_vs_dog", type="ashr")
+  resOrdered <- res[order(res$padj),]
+  return(list(resOrdered, dds))
+}
+
+plotPCAfun <- function(res, name){
+  vstRes <- vst(res, blind=T)
+  plotPCA(vstRes, intgroup=c("species")) + #xlim(-40, 40) + ylim(-40, 40) +
+          geom_text(label=colnames(res), size=3, hjust=0.5, vjust=-1)
+}
+```
+
+# Explore the data
+
+Load unfiltered data to DEseq objects:
+
+```{r, message=FALSE}
+for (t in tissues){
+  d <- get(paste(t, 'D', sep=""))
+  Res0 <- runDEseq(t, d, dannot)
+  assign(paste(t, 'Res0', sep=""), Res0)
+}
+rm(d,t)
+```
+
+## PCA
+
+```{r, message=FALSE}
+for (t in tissues){
+  d <- get(paste(t, 'Res0', sep=""))
+  p <- plotPCAfun(d[[2]], t)
+  print(p + ggtitle(t))
+}
+rm(d,t)
+```
+
+## Library size
+
+**Multi-mapped reads included.**
+
+To asses the expression of duplicated genes, I use the
+[multi-map groups (MMGs)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0734-x#Sec16)
+method implemented in [mmquant](https://bitbucket.org/mzytnicki/multi-mapping-counter/src/master/)
+
+```{r  message=FALSE, fig.width=10, fig.height=5}
+libsize <- c()
+for (t in tissues){
+  d <- get(paste(t, 'D', sep=""))
+  lsd <- colSums(d)
+  libsize <- append(libsize, lsd)
+}
+annot <- dannot
+annot <- annot[which(annot$Sample_id %in% names(libsize)),]
+rownames(annot) <- annot$Sample_id
+annot <- annot[names(libsize),]
+barplot(libsize/1000000, names.arg=names(libsize), border = F,
+        col= as.character(annot$Col), ylab = "Library size (million reads)", las =2,
+        cex.names=0.6)
+```
+
+**Multi-mapped reads excluded.**
+
+```{r  message=FALSE, fig.width=10, fig.height=5}
+libsizeNoDupl <- c()
+for (t in tissues){
+  dd <- get(paste(t, 'D', sep=""))
+  dd <- dd[-c(grep("_", rownames(dd))),]
+  lsdd <- colSums(dd)
+  libsizeNoDupl <- append(libsizeNoDupl, lsdd)
+}
+barplot(libsizeNoDupl/1000000, names.arg=names(libsizeNoDupl), border = F, ylim = c(0,80), 
+        col= as.character(annot$Col), ylab = "Library size (million reads)", las =2,
+        cex.names=0.6)
+```
+
+# Run the analyses
+
+## Remove outliers
+
+Based on the PCA and prior knowledge (e.g. potentially degradeted samples),
+I removed the outliers:
+
+```{r}
+outlierSamples <- c('Wolf_P15', 'Wolf_M6', 'Wolf_M7')
+for (t in tissues){
+  d <- get(paste(t, 'D', sep=""))
+  Dfilter <- d[,!(colnames(d) %in% outlierSamples)]
+  assign(paste(t, 'Dfilter', sep=""), Dfilter)
+}
+rm(d,Dfilter,t)
+```
+
+## Differential expression analysis
+
+```{r, message=FALSE}
+for (t in tissues){
+  d <- get(paste(t, 'Dfilter', sep=""))
+  Res <- runDEseq(t, d, dannot)
+  assign(paste(t, 'Res', sep=""), Res)
+}
+rm(d,t)
+```
+
+Summary of the results:
+
+```{r}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  message(t)
+  summary(d[[1]])
+}
+rm(d,t)
+```
+
+Note, the defaul **alpha is 0.1**, here is the number of DE genes for **0.05**:
+
+```{r}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  s <- sum(d[[1]]$padj < 0.05, na.rm=TRUE)
+  message(paste(t, s, sep = ": "))
+}
+rm(d,s)
+```
+
+Number of DE MMG (percentage):
+
+```{r}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  s <- sum(d[[1]][grep("_", rownames(d[[1]])),]$padj < 0.05, na.rm=TRUE)
+  total <- length(d[[1]][grep("_", rownames(d[[1]])),]$padj)
+  perc <- round(s/total, 2)
+  message(paste(t, s, sep = ": "), paste(" (", perc, ")", sep = ""))
+}
+rm(d,s)
+```
+
+Cook’s distances to further check if there are any outliers:
+
+```{r}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  boxplot(log10(assays(d[[2]])[["cooks"]]), range=0, las=2, main=t)
+}
+rm(d)
+```
+
+Dispersion:
+
+```{r}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  plotDispEsts(d[[2]], main=t)
+}
+rm(d)
+```
+
+Scatter plot of fold changes vs normalized counts.
+
+```{r}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  plotMA(d[[1]], ylim=c(-2,2), main=t)
+}
+```
+
+Look at specific MMG/gene (e.g. AMY2B):
+
+```{r echo=FALSE}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  gene <- rownames(d[[1]])[grep("ENSCAFG00000028653", rownames(d[[1]]))]
+  plotCounts(d[[2]], gene=gene,
+           intgroup="species", main = paste("AMY2B", t, sep = " "))
+}
+```
+
+```{r echo=FALSE}
+message("Tssue\tlogFC\tpadj")
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  amyFC <- d[[1]][grep("ENSCAFG00000028653", rownames(d[[1]])),]$log2FoldChange
+  amyPval <- d[[1]][grep("ENSCAFG00000028653", rownames(d[[1]])),]$padj
+  message(t, "\t", amyFC, "\t", amyPval)
+}
+```
+
+Data transformations for visualization
+
+```{r}
+for (t in tissues){
+  d <- get(paste(t, 'Res', sep=""))
+  vst <- vst(d[[2]], blind=T)
+  assign(paste(t, 'Vst', sep=""), vst)
+}
+```
+
+Heatmap of the count matrix
+
+```{r}
+for (t in tissues){
+  res <- get(paste(t, 'Res', sep=""))
+  vst <- get(paste(t, 'Vst', sep=""))
+  select <- order(rowMeans(counts(res[[2]], normalized=TRUE)),
+                decreasing=TRUE)[1:50]
+  d <- as.data.frame(colData(res[[2]])[,c('sex', 'age')])
+  pheatmap(assay(vst)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+           cluster_cols=FALSE, annotation_col=d, main=t)
+}
+```
+
+Sample-to-sample distances:
+
+```{r}
+for (t in tissues){
+  vst <- get(paste(t, 'Vst', sep=""))
+  sampleDists <- dist(t(assay(vst)))
+  sampleDistMatrix <- as.matrix(sampleDists)
+  rownames(sampleDistMatrix) <- paste(vst$samplesID, vst$age, vst$sex, sep="-")
+  colnames(sampleDistMatrix) <- NULL
+  colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
+  pheatmap(sampleDistMatrix,
+           clustering_distance_rows=sampleDists,
+           clustering_distance_cols=sampleDists,
+           col=colors, main=t)
+}
+```
+
+### PCA without outliers
+
+```{r}
+for (t in tissues){
+  vst <- get(paste(t, 'Vst', sep=""))
+  p <- plotPCA(vst, intgroup=c("species")) +
+          geom_text(label=colnames(vst), size=3, hjust=0.5, vjust=-1)
+  print(p + ggtitle(t))
+}
+```
+
+Write the result to files:
+
+```{r eval = FALSE}
+for (t in tissues){
+  res <- get(paste(t, 'Res', sep=""))[[1]]
+  resSig <- res[which(res$padj < 0.05),]
+  genesSig <- rownames(resSig[grep("_", rownames(resSig), invert =T),])
+  mmgSign <- rownames(resSig[grep("_", rownames(resSig)),])
+  nMMG <- length(mmgSign)
+  genesMMG <- unique(unlist(strsplit(mmgSign, "_")))
+  lenGenesMMG <- length(unlist(strsplit(mmgSign, "_")))
+  lenUniqGenesMMG <- length(genesMMG)
+  message(paste(t, ":", nMMG, "MMG;", lenGenesMMG,  'genes;', lenUniqGenesMMG, "unique;",  sep = " "))
+  write.csv(as.data.frame(res), 
+          file=paste("results/tables/DESeq2_mmquant_", t, ".csv", sep = ""))
+  write.table(as.data.frame(genesSig), row.names = F, quote = F, col.names = F,
+          file=paste("scratch/GO/DESeq2_mmquant_", t, "_sign.genes", sep = ""))
+  write.table(as.data.frame(genesMMG), row.names = F, quote = F, col.names = F,
+          file=paste("scratch/GO/DESeq2_mmquant_", t, "_sign.mmg", sep = ""))
+}
+```
