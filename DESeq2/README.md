@@ -1,7 +1,7 @@
 # Differential gene expression analysis with DESeq2
 
 [DESeq2.Rmd](DESeq2.Rmd) is an R markdown pipeline to perform a differential
-gene expression analysis with [DESeq2]().
+gene expression analysis with [DESeq2](http://bioconductor.org/packages/release/bioc/html/DESeq2.html).
 
 [data](data) contains example files to show the file formats.
 
